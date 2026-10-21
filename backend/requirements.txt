@@ -1,0 +1,29 @@
+# Pinned so a deploy is reproducible. Bump deliberately, not incidentally.
+
+# --- Web framework ---
+Django==5.1.4
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.6.0
+django-environ==0.11.2
+
+# --- Database ---
+psycopg[binary]==3.2.3
+
+# --- Background work ---
+celery==5.4.0
+redis==5.2.1
+
+# --- Object storage ---
+django-storages==1.14.4
+boto3==1.35.81
+
+# --- Media / images ---
+Pillow==11.0.0
+
+# --- Security ---
+argon2-cffi==23.1.0
+
+# --- Serving ---
+gunicorn==23.0.0
+whitenoise==6.8.2
