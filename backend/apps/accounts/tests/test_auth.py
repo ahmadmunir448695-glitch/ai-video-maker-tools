@@ -111,7 +111,11 @@ class TestRefresh:
         assert response.data["user"]["id"] == str(user.id)
 
     def test_refreshing_without_a_cookie_is_refused(self, api):
-        assert api.post(REFRESH).status_code == 400
+        """401, not 400: the SPA probes this on boot and reads 401 as signed out."""
+        response = api.post(REFRESH)
+
+        assert response.status_code == 401
+        assert response.data["code"] == "no_refresh_token"
 
     def test_a_forged_cookie_is_refused_and_cleared(self, api):
         api.cookies[settings.REFRESH_COOKIE_NAME] = "not.a.real.token"
@@ -144,7 +148,7 @@ class TestLogout:
         api.post(LOGIN, {"email": user.email, "password": FIXTURE_PASSWORD})
 
         assert api.post(LOGOUT).status_code == 204
-        assert api.post(REFRESH).status_code in (400, 401)
+        assert api.post(REFRESH).status_code == 401
 
     def test_logging_out_when_not_signed_in_is_harmless(self, api):
         assert api.post(LOGOUT).status_code == 204

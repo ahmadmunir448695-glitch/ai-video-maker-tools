@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BASE_DIR.parent
@@ -32,8 +33,15 @@ DEBUG = env.bool("DJANGO_DEBUG", default=False)
 if DEBUG:
     SECRET_KEY = env("DJANGO_SECRET_KEY", default="insecure-development-key-do-not-deploy")
 else:
-    # Deliberately no default: refuse to boot in production without a real key.
-    SECRET_KEY = env("DJANGO_SECRET_KEY")
+    # Refuse to boot in production without a real key. An unset variable and an
+    # empty one are both treated as missing, since an empty value is what a
+    # container orchestrator passes when a secret was not wired up.
+    SECRET_KEY = env("DJANGO_SECRET_KEY", default="").strip()
+    if not SECRET_KEY:
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false. Generate one with: "
+            'python -c "import secrets; print(secrets.token_urlsafe(50))"'
+        )
 
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "[::1]"])
 CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
@@ -232,6 +240,17 @@ CELERY_TASK_TIME_LIMIT = env.int("CELERY_TASK_TIME_LIMIT", default=3600)
 CELERY_TASK_SOFT_TIME_LIMIT = env.int("CELERY_TASK_SOFT_TIME_LIMIT", default=3300)
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_TASK_TRACK_STARTED = True
+
+# A worker killed mid-render (OOM, redeploy, lost spot instance) leaves its job
+# stuck in PROCESSING forever. This sweep marks such jobs failed so the user can
+# retry them, instead of watching a progress bar that will never move again.
+CELERY_BEAT_SCHEDULE = {
+    "reap-stalled-render-jobs": {
+        "task": "editing.reap_stalled_jobs",
+        "schedule": env.int("REAP_INTERVAL_SECONDS", default=900),
+        "kwargs": {"max_age_minutes": env.int("REAP_MAX_AGE_MINUTES", default=120)},
+    },
+}
 
 # ------------------------------------------------------- media limits (cost control)
 

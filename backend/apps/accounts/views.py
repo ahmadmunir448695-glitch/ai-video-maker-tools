@@ -20,8 +20,6 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.core.exceptions import DomainError
-
 from .serializers import (
     ChangePasswordSerializer,
     LoginSerializer,
@@ -104,7 +102,13 @@ class RefreshView(APIView):
     def post(self, request):
         raw = request.COOKIES.get(settings.REFRESH_COOKIE_NAME)
         if not raw:
-            raise DomainError("You are not signed in.", code="no_refresh_token")
+            # 401, not 400: a missing cookie is an authentication state, not a
+            # malformed request. The SPA calls this on every boot to find out
+            # whether a session exists, and treats 401 as "signed out".
+            return Response(
+                {"detail": "You are not signed in.", "code": "no_refresh_token"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         try:
             token = RefreshToken(raw)
